@@ -24,3 +24,19 @@ footer{margin-top:24px;color:#94a3b8;font-size:12px;text-align:center}
 .code{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
 .table tr.row-error { background: #1b2333;}
 .table tr.row-error td { border-bottom-color: #334155;}
+.header {
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: blur(6px);
+    background: rgba(15, 23, 42, 0.7);
+    border-bottom: 1px solid #1f2937;
+}
+.header-inner { max-width: 980px; margin:0 auto; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; }
+.header h1 { font-size:20px; margin:0; }
+.header .actions button { margin-left:8px; }
+
+.card { box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+.table thead th { position: sticky; top: 0; background: #0b1220; }
+.toolbar { display: flex; gap: 8px; align-items: center; }
+.toolbar .spacer { flex: 1; }
+button { transition: transform .05s ease, box-shadow .1s ease; }
+button:active { transform: translateY(1px); }
