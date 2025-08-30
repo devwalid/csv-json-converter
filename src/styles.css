@@ -40,3 +40,115 @@ footer{margin-top:24px;color:#94a3b8;font-size:12px;text-align:center}
 .toolbar .spacer { flex: 1; }
 button { transition: transform .05s ease, box-shadow .1s ease; }
 button:active { transform: translateY(1px); }
+.schema-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 0.6fr 0.8fre;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.schema-grid__head {
+    font-size: 12px; color: #9ca3af; padding: 4px 0;
+}
+.schema-input { width: 100%;}
+.schema-actions button { margin-right: 6px; }
+.schema-required { display: flex; align-items: center; justify-content: center; }
+.table thead th { position: sticky; top: 0; background: #0b1220;}
+.table tbody tr:nth-child(even) { background:#0e1626;}
+.table td,.table th{ padding:10px 12px}
+.cell-error { background: #2a1320; border-bottom-color: #3a1f2d;}
+.cell-ok { background: transparent;}
+/* Dropzone look for FileUpload */
+input[type=file] {
+    border: 2px  dashed #334155;
+    background: #0b1220;
+    padding: 16px;
+    border-radius:12px;
+}
+input[type=file]::file-selector-button{
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-right: 10px;
+    background: #172032;
+    color: #e5e7eb;
+}
+
+/* Card rythm */
+.card { margin-bottom: 24px; }
+.card h2 { margin-bottom: 10px; }
+
+/* Buttons uniform */
+.button { padding: 10px 16px; border-radius: 10px; }
+.button.primary { font-weight: 700;}
+
+/* widen the page */
+.container{max-width: 1500px; margin: 40px auto;padding: 0 20px;}
+
+/* cards breathea bit less vertically but use width fully */
+.card{padding: 18px;}
+
+/* buttons row gaps */
+.toolbar{display: flex;gap: 8px;align-items: center}
+.toolbar .spacer{flex: 1;}
+
+/* preview table gets sticky header + zebra (already similar) */
+.table thead th{position: sticky;top: 0;background: #0b1220}
+.table tbody tr:nth-child(even){background: #0e1626}
+.table td,.table th{padding: 10px 12px}
+
+/* schema cards grid */
+.schema-cards{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 12px;
+}
+@media (max-width: 1100px) {
+    .schema-cards { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 720px) {
+    .schema-cards{ grid-template-columns: 1fr; }
+}
+
+.schema-card{
+    border:1px solid #334155;
+    background: #0b1220;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.schema-card.drag_over{ outline: 2px dashed #22c55e; outline-offset: -4px; }
+.schema-card .rowline{ display: flex; gap: 8px; align-items: center; }
+.schema-card .rowline > *{ flex:1 }
+.schema-card .top{ display: flex; gap: 8px; align-items: center }
+.schema-card .top .req{ display: flex; align-items: center; gap: 8px; white-space: nowrap}
+.schema-card .actions{ display: flex; gap: 8px; justify-content: flex-end }
+.table{ font-size: 13.px }
+
+.schema-card {
+    border: 1px solid #334155;
+    background: #0b1220;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: grab;
+}
+.schema-card:active {
+    cursor: grabbing;
+}
+
+.schema-card.drag-over {
+    outline: 2px dashed #22c55e;
+    outline-offset: -4px;
+    background: #132033;
+}
+
+/* draggable headers */
+th.th-draggable { cursor: grab; user-select: none; }
+th.th-draggable:active { cursor: grabbing; }
+th.th-draggable { transition: background .12s ease }
+th.th-draggable.drag-over { background:#10233a; }
