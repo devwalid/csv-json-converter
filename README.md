@@ -1,26 +1,71 @@
-# CSV → JSON Converter (React + Vite)
+# CSV → JSON Converter
 
-Quick demo app to upload a CSV, validate rows against a simple JSON schema, preview the data, and export as JSON.
+A React-based utility that lets you upload CSV files, validate them against a schema, and export clean JSON.  
+Built for learning + portfolio demonstration.
 
-## Features
-- CSV parsing with headers (PapaParse)
-- JSON schema (array of fields: `name`, `type`, `required`)
-- Per-row validation (required fields, number, email)
-- Preview first 10 rows + validation report
-- Download valid dataset as JSON
+---
 
-## Getting Started
+## ✨ Features
+
+- 📂 **Upload CSV** with header auto-detection (via PapaParse).
+- 📝 **Schema Builder**:
+  - Card-based UI in a responsive 3-column grid.
+  - Define field name, type (`string`, `number`, `email`, `date`, …).
+  - Mark fields as required.
+  - Drag-and-drop reordering.
+  - Syncs with live JSON.
+- 👀 **Preview Table**:
+  - First 10 rows shown.
+  - Per-cell validation highlights.
+  - Column headers draggable for reordering.
+- ✅ **Validation Report**:
+  - Row-by-row error list.
+  - Download errors as CSV.
+- 📤 **Export Options**:
+  - Full JSON.
+  - JSON with selected columns.
+  - Export/import schema.
+
+---
+
+## 🖼️ Screenshots
+
+### Home
+![Upload + Schema](./screenshots/upload-schema.png)
+
+### Schema Builder
+![Schema Builder](./screenshots/schema-builder.png)
+
+### Preview + Validation
+![Preview Table](./screenshots/preview.png)
+
+---
+
+## 🛠️ Tech Stack
+
+- [React (Vite)](https://vitejs.dev/)
+- [PapaParse](https://www.papaparse.com/) for CSV parsing
+- [file-saver](https://github.com/eligrey/FileSaver.js/) for downloads
+
+---
+
+## 🚀 Running locally
+
 ```bash
+# clone this repo
+git clone <your-repo-url>
+cd csv-json
+
+# install deps
 npm install
+
+# start dev server
 npm run dev
-```
 
-## Tech
-- React 18, Vite 5
-- papaparse for CSV parsing
-- file-saver for JSON download
+📌 Notes
+	•	Built for portfolio demonstration.
+	•	Not production-hardened but easy to extend (XLSX, filters, API integration, etc.).
+	•	Designed to be UI-friendly and modern.
 
-## Notes
-- Extend `validators.js` for more rules (dates, min/max, regex).
-- Replace the default schema in the UI or edit `DEFAULT_SCHEMA` in `App.jsx`.
-- Add XLSX support later via the `xlsx` package.
+👤 Author
+Built by Walid (@devwalid)
