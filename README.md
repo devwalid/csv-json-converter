@@ -39,6 +39,9 @@ Built for learning + portfolio demonstration.
 ### Preview + Validation
 ![Preview Table](./screenshots/preview.png)
 
+### Validation + Export
+![Validation + Export](./screenshots/validation-export.png)
+
 ---
 
 ## 🛠️ Tech Stack
