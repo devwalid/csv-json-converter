@@ -21,25 +21,56 @@ export default function App() {
   const [headerOrder, setHeaderOrder] = useState([])
   const [dragCol, setDragCol] = useState(null)
 
-  function parseCSV(selectedFile) {
+  function detectDelimiter(sample = '') {
+    const line = (sample.split(/\r?\n/).find(l => l.trim()) || '')
+    const candidates = [',', ';', '\t', '|']
+    const scores = candidates.map(d => ({
+      delim: d,
+      count: (line.match(new RegExp(`\\${d}`, 'g')) || []).length
+    }))
+    const best = scores.sort((a, b) => b.count - a.count)[0]
+    return best && best.count > 0 ? best.delim : '' // '' lets Papa auto-detect
+  }
+
+  function looksBinary(textSample = '') {
+    return /\u0000/.test(textSample)
+  }
+
+  async function parseCSV(selectedFile) {
     if (!selectedFile) return
-    Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false, // We handle coercion ourselves
-      complete: (results) => {
-        const data = results.data
-        setRows(data)
-        setSelectedCols(results.meta?.fields || [])
-        setHeaders(results.meta?.fields || [])
-        setErrors([])
-      },
-      error: (err) => setErrors([`Parse error: ${err.message}`]),
-    })
-    const fields = results.meta?.fields || []
-    setHeaders(fields)
-    setHeaderOrder(fields)
-    setSelectedCols(fields)
+
+    try {
+      const sample = await selectedFile.slice(0, 4096).text()
+      if (looksBinary(sample)) {
+        setErrors([`"${selectedFile.name}" does not look like a text/CSV file.`])
+        return
+      }
+
+      const delimiter = detectDelimiter(sample.replace(/^\uFEFF/, ''))
+
+      Papa.parse(selectedFile, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        delimiter,
+        dynamicTyping: false, // We handle coercion ourselves
+        complete: (results) => {
+          const data = results.data
+          const fields = results.meta?.fields || []
+          const parseErrors = results.errors?.length
+            ? results.errors.map(e => `Parse error (row ${e.row ?? '?'}): ${e.message}`)
+            : []
+
+          setRows(data)
+          setHeaders(fields)
+          setHeaderOrder(fields)
+          setSelectedCols(fields)
+          setErrors(parseErrors)
+        },
+        error: (err) => setErrors([`Parse error: ${err.message}`]),
+      })
+    } catch (err) {
+      setErrors([`Failed to read file: ${err.message}`])
+    }
   }
 
   const orderedHeaders = useMemo(() => {
@@ -66,6 +97,15 @@ export default function App() {
     }
   }
 
+  const parsedSchema = useMemo(() => {
+    try {
+      const p = JSON.parse(schemaText)
+      return Array.isArray(p) ? p : [] 
+    } catch {
+      return []
+    }
+  }, [schemaText])
+
   const validationReport = useMemo(() => {
     if (!rows.length) return []
     const schema = currentSchema()
@@ -82,6 +122,21 @@ export default function App() {
     for (const r of validationReport) if (r.errors.length > 0) s.add(r.index)
     return s
   }, [validationReport])
+
+  const columnErrorCount = useMemo(() => {
+    const counts = {}
+    headers.forEach(h => { counts[h] = 0 })
+    if (!rows.length || !parsedSchema.length) return counts
+
+    for (const row of rows) {
+      for (const h of headers) {
+        if (cellHasError(row, parsedSchema, h)) {
+          counts[h] = (counts[h] || 0) + 1
+        }
+      }
+    }
+    return counts
+  }, [rows, headers, parsedSchema])
 
   function downloadJSON() {
     const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json;charset=utf-8' })
@@ -161,15 +216,6 @@ export default function App() {
     f.text().then(txt => setSchemaText(txt))
   }
 
-  const parsedSchema = useMemo(() => {
-    try {
-      const p = JSON.parse(schemaText)
-      return Array.isArray(p) ? p : [] 
-    } catch {
-      return []
-    }
-  }, [schemaText])
-
   useEffect(() => localStorage.setItem('schemaText', schemaText), [schemaText])
   useEffect(() => localStorage.setItem('selectedCols', JSON.stringify(selectedCols)),
   [selectedCols])
@@ -237,164 +283,263 @@ export default function App() {
     setDragCol(null)
   }
 
+  const fileName = file?.name || 'No file uploaded'
+
   return (
-    <div className="container">
-      <div className="header">
-        <div className="header-inner">
-          <h1 className="code">CSV - JSON Converter</h1>
-          <div className="actions">
-            <button className="ghost" onClick={clearAll}>New file</button>
-            {!hasErrors && rows.length > 0 && <button className="primary" onClick={downloadJSON}>Export JSON</button>}
+    <div className="page-shell space-y-6">
+      <header className="glass rounded-3xl p-6 md:p-8 space-y-6">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-3">
+            <span className="pill">CSV → JSON · Schema-first</span>
+            <h1 className="text-3xl md:text-4xl font-semibold text-white">
+              CSV validation + JSON export
+            </h1>
+            <p className="text-slate-300 max-w-2xl">
+              Upload a CSV, infer or design a schema, see instant validation, and export clean JSON with column control.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {rows.length > 0 && (
+                <button className="btn-primary" onClick={downloadJSON}>Export JSON</button>
+              )}
+            </div>
+          </div>
+          <div className="glass rounded-2xl p-4 w-full md:w-72 space-y-3">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Status</p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">File</span>
+                <span className="font-semibold text-white truncate max-w-[180px]" title={fileName}>{fileName}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">Rows parsed</span>
+                <span className="font-semibold text-emerald-200">{rows.length}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">Headers</span>
+                <span className="font-semibold text-sky-200">{headers.length}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">Errors</span>
+                <span className={`font-semibold ${hasErrors ? 'text-rose-300' : 'text-emerald-200'}`}>
+                  {hasErrors ? 'Present' : 'Clean'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      <p className="success">Upload a CSV, validate against a simple schema, and export as JSON.</p>
+      </header>
+
+      {errors.length > 0 && (
+        <div className="card border border-rose-500/30 bg-rose-500/10 text-rose-100">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 text-lg">⚠️</div>
+            <div>
+              <p className="font-semibold">Parse issues</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {errors.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FileUpload onFileSelected={handleFileSelected} />
 
-      <div className="card">
-        <h2>2) Define schema (JSON)</h2>
-        <small>Describe your CSV columns. Add rows, set type and required. JSON stays in sync below.</small>
+      <div className="card space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="section-title">Step 2 · Schema</p>
+            <h2 className="text-xl font-semibold text-white">Define schema (JSON)</h2>
+            <p className="text-sm text-slate-400">Describe CSV columns, set type and required, or pull headers to kickstart.</p>
+          </div>
+          <div className="chip">⌘I · Use headers</div>
+        </div>
         <SchemaBuilder
           schemaText={schemaText}
           setSchemaText={setSchemaText}
           headers={headers}
-          onUseHeaders={() => {}}
+          onUseHeaders={useHeadersAsSchema}
         />
       </div>
 
-      <div className="card">
-        <h2>3) Preview</h2>
-        <button className="ghost" onClick={()=>setHeaderOrder(headers)}>Reset column order</button>
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="section-title">Step 3 · Preview</p>
+            <h2 className="text-xl font-semibold text-white">Data snapshot</h2>
+            <p className="text-sm text-slate-400">Drag headers to reorder. Cells highlight when they break the schema.</p>
+          </div>
+          <button className="btn-quiet" onClick={()=>setHeaderOrder(headers)}>Reset order</button>
+        </div>
+
         {headers.length ? (
-          <div style={{overflowX:'auto'}}>
-            <table className="table">
-              <thead>
-                <tr>
-                  {headers.map(h => {
-                    const f = parsedSchema.find(x => x.name === h)
-                    const t = f?.type
-                    const req = !!f?.required
+          <>
+            <div className="table-wrap">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr>
+                    {headers.map(h => {
+                      const f = parsedSchema.find(x => x.name === h)
+                      const t = f?.type
+                      const req = !!f?.required
+                      const errCount = columnErrorCount[h] || 0
+                      return (
+                        <th
+                          key={h}
+                          draggable
+                          onDragStart={(e)=>onHeaderDragStart(h, e)}
+                          onDragOver={(e)=>onHeaderDragOver(h, e)}
+                          onDrop={(e)=>onHeaderDrop(h, e)}
+                          aria-grabbed={dragCol === h ? 'true' : 'false'}
+                          title="Drag to reorder"
+                          className={`sticky top-0 z-10 border-b border-white/10 bg-slate-900/70 px-3 py-2 text-left text-[11px] uppercase tracking-wide text-slate-400 cursor-grab select-none ${dragCol && dragCol!==h ? 'opacity-60' : ''}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-white">{h}</span>
+                            {t && <span className="text-xs text-slate-500">({t}{req ? ' • req' : ''})</span>}
+                            {errCount > 0 && (
+                              <span className="badge-err" title={`${errCount} cell(s) failing validation`}>
+                                {errCount}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 10).map((row, i) => {
+                    const rowIndex = i + 1
+                    const badRow = errorIndexSet.has(rowIndex)
                     return (
-                      <th
-                        key={h}
-                        draggable
-                        onDragStart={(e)=>onHeaderDragStart(h, e)}
-                        onDragOver={(e)=>onHeaderDragOver(h, e)}
-                        onDrop={(e)=>onHeaderDrop(h, e)}
-                        aria-grabbed={dragCol === h ? 'true' : 'false'}
-                        title="Drag to reorder"
-                        className={`th-draggable ${dragCol && dragCol!==h ? 'drag-target' : ''}`}
-                      >
-                        {h}
-                        {t && <div style={{ fontSize: 12, color: '#94a3b8' }}>({t}{req ? ' • req' : ''})</div>}
-                      </th>
+                      <tr key={i} className={badRow ? 'bg-rose-500/5' : 'bg-white/0'}>
+                        {orderedHeaders.map(h => {
+                          const bad = cellHasError(row, parsedSchema, h)
+                          return (
+                            <td
+                              key={h}
+                              className={`whitespace-nowrap px-3 py-2 text-slate-100 border-b border-white/5 ${bad ? 'bg-rose-500/10 text-rose-50' : 'bg-slate-900/40'}`}
+                            >
+                              {String(row[h] ?? '')}
+                            </td>
+                          )
+                        })}
+                      </tr>
                     )
                   })}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 10).map((row, i) => {
-                  const rowIndex = i + 1
-                  const rowClass = errorIndexSet.has(rowIndex) ? 'row-error' : ''
-                  return (
-                    <tr key={i} className={rowClass}>
-                      {orderedHeaders.map(h => {
-                        const bad = cellHasError(row, parsedSchema, h)
-                        return <td key={h} className={bad ? 'cell-error' : ''}>{String(row[h] ?? '')}</td>
-                      })}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <small>Showing first 10 of {rows.length} rows.</small>
-          </div>
-        ) : <small>No data parsed yet.</small>}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-slate-400">Showing first 10 of {rows.length} rows.</p>
+          </>
+        ) : <p className="text-sm text-slate-400">No data parsed yet.</p>}
       </div>
 
-      <div className="card">
-        <h2>4) Columns to include in export</h2>
-        {headers.length === 0 && <small>Upload a CSV to choose columns.</small>}
+      <div className="card space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="section-title">Step 4 · Columns</p>
+            <h2 className="text-xl font-semibold text-white">Columns to include in export</h2>
+            <p className="text-sm text-slate-400">Pick the subset you want in the JSON, or keep all.</p>
+          </div>
+          <div className="chip">Headers: {headers.length || '—'}</div>
+        </div>
+        {headers.length === 0 && <p className="text-sm text-slate-400">Upload a CSV to choose columns.</p>}
         {headers.length > 0 && (
-          <div className="row" style={{gap:16, alignItems:'flex-start'}}>
-            <div style={{maxHeight:180, overflowY:'auto', border:'1px solid #334155', borderRadius:8, padding:10, flex:'0 0 360px'}}>
-              <label style={{display: 'block', marginBottom:8}}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start">
+            <div className="max-h-60 w-full md:w-[360px] overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+              <label className="flex items-center gap-2 text-sm text-slate-200">
                 <input
                   type="checkbox"
+                  className="accent-emerald-400"
                   checked={selectedCols.length === headers.length}
                   onChange={(e) => setSelectedCols(e.target.checked ? headers : [])}
-                />{' '}
+                />
                 Select all
               </label>
               {headers.map(h => (
-                <label key={h} style={{display:'block', margin:'6px 0'}}>
+                <label key={h} className="flex items-center gap-2 text-sm text-slate-200">
                   <input
                     type="checkbox"
+                    className="accent-emerald-400"
                     checked={selectedCols.includes(h)}
                     onChange={(e) => {
                       setSelectedCols(prev => e.target.checked ? [...new Set([...prev, h])] : prev.filter(x => x !== h))
                     }}
-                  />{' '}
+                  />
                   {h}
                 </label>
               ))}
             </div>
-            <small>Tip: leave all selected to export the full JSON; or choose only the fields you want to keep.</small>
+            <p className="text-sm text-slate-400">Tip: leave all selected to export full JSON; or choose only the fields you want.</p>
           </div>
         )}
       </div>
 
-      <div className="card">
-        <h2>5) Validation Report</h2>
-        {rows.length === 0 && <small>Upload a CSV to see validation results.</small>}
-        {rows.length > 0 && (
+      <div className="card space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <p>
-              Rows: <span className="badge">{rows.length}</span> &nbsp;|&nbsp;
-              Headers: <span className="badge">{headers.length}</span> &nbsp;|&nbsp;
-              Errors present: {hasErrors ? <span className="err">Yes</span> : <span className="success">No</span>}
-            </p>
-            <ul>
+            <p className="section-title">Step 5 · Validation</p>
+            <h2 className="text-xl font-semibold text-white">Validation Report</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="chip">Rows: {rows.length}</span>
+            <span className="chip">Headers: {headers.length}</span>
+            <span className={`chip ${hasErrors ? 'border-rose-400/40 text-rose-200' : 'border-emerald-400/40 text-emerald-100'}`}>
+              {hasErrors ? 'Errors present' : 'All good'}
+            </span>
+          </div>
+        </div>
+
+        {rows.length === 0 && <p className="text-sm text-slate-400">Upload a CSV to see validation results.</p>}
+
+        {rows.length > 0 && (
+          <div className="space-y-3">
+            <ul className="space-y-1 text-sm">
               {validationReport.map(r => (
                 r.errors.length > 0 ? (
-                  <li key={r.index} className="err">
+                  <li key={r.index} className="text-rose-200">
                     Row {r.index}: {r.errors.join('; ')}
                   </li>
                 ) : null
               ))}
             </ul>
-            <div className="row" style={{marginTop:8, gap:8}}>
-              <button className="ghost" onClick={clearAll}>clear</button>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-ghost" onClick={clearAll}>Clear</button>
 
               {!hasErrors && rows.length > 0 && (
                 <>
-                  <button className="primary" onClick={downloadJSON}>Download JSON</button>
-                  <button onClick={downloadJSONSelected}>Download JSON (selected Columns)</button>
+                  <button className="btn-primary" onClick={downloadJSON}>Download JSON</button>
+                  <button className="btn-ghost" onClick={downloadJSONSelected}>Download JSON (selected)</button>
                 </>
               )}
 
               {hasErrors && (
-                <button onClick={downloadErrorsCSV}>Download Errors (CSV)</button>
+                <button className="btn-ghost" onClick={downloadErrorsCSV}>Download Errors (CSV)</button>
               )}
-              <button onClick={downloadSchema}>Export schema</button>
-              <label className="ghost" style={{padding:'10px 14px', cursor:'pointer'}}>
+              <button className="btn-ghost" onClick={downloadSchema}>Export schema</button>
+              <label className="btn-quiet cursor-pointer">
                 Import schema
-                <input type="file" accept="application/json" onChange={uploadSchema} style={{display:'none'}} />
+                <input type="file" accept="application/json" onChange={uploadSchema} className="hidden" />
               </label>
             </div>
           </div>
         )}
       </div>
 
-      <div className="card">
-        <h2>Sample CSV (copy/paste into a file)</h2>
-        <pre className="code">{`name,email,age, Alice,alice@example.com,30, Bob,bob[at]example.com,thirty
-        `}</pre>
-        <small>In this sample: Row 2 has invalid email; Row 3 has invalid email and non-numeric age.</small>
+      <div className="card space-y-3">
+        <div>
+          <p className="section-title">Sample CSV</p>
+          <h2 className="text-xl font-semibold text-white">Copy/paste to test</h2>
+        </div>
+        <pre className="rounded-xl bg-black/50 border border-white/10 p-4 text-sm font-mono text-slate-100 overflow-auto">{`name,email,age
+Alice,alice@example.com,30
+Bob,bob[at]example.com,thirty`}</pre>
+        <p className="text-xs text-slate-400">Sample shows: Row 2 invalid email; Row 3 invalid email + non-numeric age.</p>
       </div>
 
-      <footer>
+      <footer className="text-center text-xs text-slate-500 py-8">
         Built by Walidev — CSV → JSON Converter demo.
       </footer>
     </div>

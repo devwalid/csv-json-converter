@@ -15,7 +15,7 @@ function normalizeFields(maybeArray) {
 export default function SchemaBuilder({ schemaText, setSchemaText, headers = [], onUseHeaders }) {
     const [rows, setRows] = useState([])
     const [dragIndex, setDragIndex] = useState(null)
-    const [overIdex, setOverIndex] = useState(null)
+    const [overIndex, setOverIndex] = useState(null)
 
     useEffect(() => {
         try {
@@ -81,43 +81,44 @@ export default function SchemaBuilder({ schemaText, setSchemaText, headers = [],
     }, [rows])
 
     return (
-        <div>
-            <div className="toolbar" style={{marginBottom:10}}>
-                <button onClick={addRow}>+ Add field</button>
-                <div className="spacer" />
-                <button className="ghost" onClick={useHeaders} disabled={!headers.length}>Use headers as schema</button>
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <button className="btn-primary" onClick={addRow}>+ Add field</button>
+                <button className="btn-ghost" onClick={useHeaders} disabled={!headers.length}>Use headers as schema</button>
+                <span className="text-xs text-slate-400 ml-auto">Drag cards to reorder</span>
             </div>
 
-            <div className="schema-cards">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {rows.map((r, i) => (
                     <div
                         key={i}
-                        className={`schema-card ${overIdex===i ? 'drag-over' : ''}`}
+                        className={`rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3 cursor-grab transition ${overIndex===i ? 'ring-2 ring-emerald-400/60' : 'hover:border-white/20'}`}
                         draggable
                         onDragStart={() => onDragStart(i)}
                         onDragOver={(e) => onDragOver(e, i)}
                         onDrop={(e) => onDrop(e, i)}
                     >
-                        <div className="top">
+                        <div className="flex items-center gap-3">
                             <input
-                                className="schema-input"
+                                className="field"
                                 value={r.name}
                                 placeholder="e.g., Amount Spent (USD)"
                                 onChange={e => updateRow(i, 'name', e.target.value)}
                             />
-                            <div className="req">
+                            <label className="flex items-center gap-2 text-xs text-slate-300">
                                 <input
                                     type="checkbox"
+                                    className="accent-emerald-400"
                                     checked={r.required}
                                     onChange={e => updateRow(i, 'required', e.target.checked)}
                                 />
-                                <small>required</small>
-                            </div>
+                                required
+                            </label>
                         </div>
 
-                        <div className="rowline">
+                        <div className="flex gap-2">
                             <select
-                                className="schema-input"
+                                className="field"
                                 value={r.type}
                                 onChange={e => updateRow(i, 'type', e.target.value)}
                             >
@@ -125,30 +126,30 @@ export default function SchemaBuilder({ schemaText, setSchemaText, headers = [],
                             </select>
                         </div>
 
-                        <div className="actions">
-                            <button className="ghost" onClick={() => removeRow(i)}>Delete</button>
+                        <div className="flex justify-end">
+                            <button className="btn-quiet" onClick={() => removeRow(i)}>Delete</button>
                         </div>
                     </div>
                 ))}
             </div>
 
             {errors.length > 0 && (
-                <div style={{marginTop:8}}>
-                    <ul className="err">
+                <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">
+                    <ul className="list-disc list-inside space-y-1">
                         {errors.map((e, idx) => <li key={idx}>{e}</li>)}
                     </ul>
                 </div>
             )}
             
-            <div style={{marginTop:12}}>
-                <label>Schema JSON (read/write)</label>
+            <div className="space-y-2">
+                <label className="text-sm text-slate-300">Schema JSON (read/write)</label>
                 <textarea
                     rows={10}
-                    className="code"
+                    className="field font-mono min-h-[220px]"
                     value={schemaText}
                     onChange={(e)=>setSchemaText(e.target.value)}
                 />
-                <small>Drag to reorder cards. Edits sync to the JSON.</small>
+                <p className="text-xs text-slate-400">Drag to reorder cards. Edits stay in sync with the JSON below.</p>
             </div>
         </div>
     )
